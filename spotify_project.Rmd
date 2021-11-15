@@ -1,0 +1,217 @@
+---
+title: "final_proj"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# library import
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+library(broom)
+library(AER)
+library(readr)
+library(spotifyr)
+library(corrplot)
+library(vtable)
+
+# optional settings
+theme_set(theme_minimal())
+options(pillar.min_character_chars = 15)
+options(dplyr.summarise.inform = FALSE)
+options(readr.show_col_types = FALSE)
+options(ggrepel.max.overlaps = Inf)
+options(width = 85L)
+```
+
+```{r spotifyr}
+#Sys.setenv(SPOTIFY_CLIENT_ID = '24105134c057498aa68b53aaba318ef5') # this is just developer 
+#Sys.setenv(SPOTIFY_CLIENT_SECRET = '4220a8ab4b224fde8cf50182b6171f34') # may change with every session
+
+#access_token <- get_spotify_access_token() # access token from developer dashboard 
+
+#my_plists <- get_user_playlists('6iiwl0m7m0jgvcu7khnis8o6q', offset = 0) # user id
+
+#tracks <- get_playlist_tracks(my_plists)
+#features <- get_track_audio_features(tracks)
+
+```
+
+This first dataset...
+```{r top10}
+# test set, using this to play around with what variables to use
+
+# top10 <- read_csv("/Users/jimmyq/Desktop/senior fall/econ370/q_data/top10s.csv")
+# https://www.kaggle.com/leonardopena/top-spotify-songs-from-20102019-by-year : datasource 
+
+# basic cleaning 
+# top10edited <- top10 %>%
+  #drop_na() %>% # drop missing values (should be none)
+  #select(-c(...1)) %>% # drop index column
+  #rename(energy = nrgy, dance = dnce, valence = val) %>%
+  #rename_with( ~ tolower(gsub(" ", "_", .x, fixed = TRUE))) # lowercase all columns + replace space with "_"  
+
+# summary statistics of top10 dataset 
+#str(top10edited)
+#summary(top10edited)
+```
+
+
+
+
+This second dataset...
+```{r rollingstone}
+rolling_stone <- read_csv("/Users/jimmyq/Desktop/senior fall/econ370/q_data/rollingstone2.csv")
+# from webscrape of the rolling stone top 500 songs playlist as of sept 2021
+
+rs_edited <- rolling_stone %>%
+  rename(song_rank = ...1, bpm = tempo, dB = loudness, acoustic = acous, song_name = name, spotify_id = id) %>%
+  mutate(song_rank = song_rank + 1) %>% # not totally sure this column is 100% reliable i need to check 
+  rename_with( ~ tolower(gsub(" ", "_", .x, fixed = TRUE))) # next mutate to scale 
+
+rs_edited <- rs_edited %>% # scaling the numbers so they're easier to work with 
+  mutate(dance = dance*100) %>%
+  mutate(energy = energy*100) %>%
+  mutate(speech = speech*100) %>%
+  mutate(mode = mode*100) %>%
+  mutate(acoustic = round(acoustic*100, 2)) %>%
+  mutate(instrum = round(instrum*100, 2)) %>%
+  mutate(live = live*100) %>%
+  mutate(valence = valence*100) %>%
+  mutate(duration_s = `duration_(ms)`/1000) %>%
+  select(-c(song_name, artist, album, id_check))
+
+# need to run some interaction effects
+# rs_interaction <- rs_edited %>%
+#   mutate(dance_sq = dance*dance) %>%
+#   mutate(energy_sq = energy*energy) %>%
+#   mutate(live_sq = live*live) %>%
+#   mutate(ln_valence = log(valence))
+
+# summary stats
+str(rs_edited)
+summary(rs_edited)
+```
+
+(...1, renamed to song_rank) index should correspond with the rank of the song in the dataset this can be checked by looking at the rankings on rs 
+
+```{r outOfSample}
+# this dataset is for out of model testing, going to use the rolling stone set to establish the features i want to use in my initial regression, once i find a group of features that explain the valence of a song i will then run with this set to see if those features are good predictors for regular data 
+
+out_of_sample <- read_csv("/Users/jimmyq/Desktop/senior fall/econ370/q_data/spotifyoutofsample.csv")
+
+oos_edited <- out_of_sample %>%
+  rename(index = ...1, bpm = tempo, dB = loudness, acoustic = acous, song_name = name, spotify_id = id) %>%
+  mutate(index = index + 1) %>% # not totally sure this column is 100% reliable i need to check 
+  rename_with( ~ tolower(gsub(" ", "_", .x, fixed = TRUE))) # next mutate to scale 
+
+oos_edited <- oos_edited %>% # scaling the numbers so they're easier to work with 
+  mutate(dance = dance*100) %>%
+  mutate(energy = energy*100) %>%
+  mutate(speech = speech*100) %>%
+  mutate(mode = mode*100) %>%
+  mutate(acoustic = round(acoustic*100, 2)) %>%
+  mutate(instrum = round(instrum*100, 2)) %>%
+  mutate(live = live*100) %>%
+  mutate(valence = valence*100) %>%
+  mutate(duration_s = `duration_(ms)`/1000) %>%
+  select(-c(song_name, artist, album, id_check, index))
+
+# summary stats
+str(oos_edited)
+summary(oos_edited)
+```
+
+
+```{r plots, echo = FALSE}
+# correlation coefficients table 
+# can save these to serve as visual aid 
+# subset of df for correlation coefficients table for rolling stone
+varsRS <- c("dance", "energy", "speech", "acoustic", "instrum", 
+            "live", "valence", "duration_s", "song_rank", "db", "bpm",
+            "popularity")
+corrRS <- rs_edited[varsRS]  
+corrcoefRS <- cor(corrRS) 
+round(corrcoefRS, 2)
+corrplot(corrcoefRS, type="full",order="hclust", tl.col = "black", tl.srt = 45)
+
+# corr coefs for top10
+#vars10 <- c("bpm", "energy", "dance",
+#            "db", "live", "valence", "dur", 
+#            "acous", "spch", "pop") # top_genre needs to be 0,1,2...
+#corr10 <- top10edited[vars10]  
+#corrcoef10 <- cor(corr10) 
+#round(corrcoef10, 2)
+#corrplot(corrcoef10, type="full",order="hclust", tl.col = "black", tl.srt = 45)
+
+
+# corr coefs and plot for test set
+varsTest <- c("dance", "energy", "speech", "acoustic", "instrum", 
+            "live", "valence", "duration_s", "db", "bpm",
+            "popularity")
+corrTest <- oos_edited[varsTest]  
+corrcoefTest <- cor(corrTest) 
+round(corrcoefTest, 2)
+corrplot(corrcoefTest, type="full",order="hclust", tl.col = "black", tl.srt = 45)
+
+```
+
+
+```{r summary_tables}
+# summary tables creating using vtable library, should generate laTex code in the output. Then use that laTex code in overleaf project document to output the pdfs 
+
+# summary table, for rs
+#st(rs_edited,
+#   out = "latex",
+#   file = "rollingStone_summary.tex",
+#   summ = c("min(x)", "mean(x)", "max(x)"),
+#   summ.names = c("Minimum", "Mean", "Maximum"),
+#   title = "Rolling Stone 500 Greatest Songs Summary Statistics"
+#   )
+
+# summary measures for oos 
+#st(oos_edited,
+#   out = "latex",
+#   file = "OutOfSample_summary.tex",
+#   summ = c("min(x)", "mean(x)", "max(x)"),
+#   summ.names = c("Minimum", "Mean", "Maximum"),
+#   title = "Out of Sample for Testing Summary Statistics"
+#   )
+
+# st(top10edited,
+# out = "latex",
+#   file = "top10_summary.tex",
+#   summ = c("min(x)", "mean(x)", "max(x)"),
+#   summ.names = c("Minimum", "Mean", "Maximum"),
+#   title = "Top 10s since 2010-19 Summary Statistics"
+#   )
+```
+
+
+```{r analysis}
+# gonna run a few different regressions to fit the rolling stone list valence
+# to my test set 
+# prelim investigation 
+
+
+reg <- lm(valence ~ dance + energy + key + db + 
+            speech + acoustic + instrum + live + popularity + bpm +
+            duration_s, data = rs_edited)
+summary(reg)
+
+
+reg2 <- lm(pop ~ bpm + energy + dance + db + live +
+            valence + dur + acous + spch, data = top10edited)
+summary(reg2)
+
+# ordered probit for song_rank in rolling stone set  
+
+# also there has to be some sort of KNN for the valence and test using oos
+
+
+```
+
+next step is to build the model and then fit using a "valence" song to test the validity of the model fit  
