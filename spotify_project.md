@@ -4,14 +4,14 @@ final_proj
 ``` r
 # large random dataset of 3000+ songs, found this on reddit.."3000 songs everyone should hear" https://open.spotify.com/playlist/5kLB4N6DX3DffIoqVsxPS4?si=wPYdUDfHSLO800trQbpo3Q&nd=1
 
-big_set <- read_csv("/Users/jimmyq/Desktop/senior fall/econ370/q_data/random_big.csv")
+big_set <- read_csv("random_big.csv")
 ```
 
     ## New names:
     ## * `` -> ...1
 
 ``` r
-# /Users/jimmyq/Desktop/senior fall/econ370/q_data/top10s.csv --> smaller subset of top10s
+# top10s.csv --> smaller subset of top10s
 
 
 bs_edited <- big_set %>%
@@ -126,7 +126,7 @@ big_set %>% # highest to lowest valence
     ## #   popularity <dbl>, name <chr>, artist <chr>, album <chr>, id <chr>
 
 ``` r
-rolling_stone <- read_csv("/Users/jimmyq/Desktop/senior fall/econ370/q_data/rollingstone2.csv")
+rolling_stone <- read_csv("rollingstone2.csv")
 ```
 
     ## New names:
@@ -287,14 +287,14 @@ summary(rs_extra)
 ``` r
 # this dataset is for out of model testing, going to use the rolling stone set to establish the features i want to use in my initial regression, once i find a group of features that explain the valence of a song i will then run with this set to see if those features are good predictors for regular data 
 
-out_of_sample <- read_csv("/Users/jimmyq/Desktop/senior fall/econ370/q_data/spotifyoutofsamplebig.csv")
+out_of_sample <- read_csv("spotifyoutofsamplebig.csv")
 ```
 
     ## New names:
     ## * `` -> ...1
 
 ``` r
-# /Users/jimmyq/Desktop/senior fall/econ370/q_data/spotifyoutofsample.csv --> smaller subset of the top 10 including "happy"
+# spotifyoutofsample.csv --> smaller subset of the top 10 including "happy"
 
 
 oos_edited <- out_of_sample %>%
